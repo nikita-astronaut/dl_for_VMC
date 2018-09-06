@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 class square_geometry:
 	def __init__(self, Lx, Ly):
 		self.Lx = Lx
@@ -22,3 +24,11 @@ class square_geometry:
 		for global_index, amplitude in enumerate(wave_function):
 			x, y = _to_global(x, y)
 			wave_function_2D[x, y] = amplitude
+
+	def get_random_state(self, n_states):  # returns multiple states at once
+		return np.random.choice(np.array([-1.0, 1.0]), size = (self.Lx * self.Ly, n_states))
+
+	def flip_random_spins(self, states):  # flips random spins in all states at once
+		new_state = deepcopy(states)
+		new_state[np.random.randint(low=0, high = states.shape[0], size = states.shape[1]), np.arange(states.shape[1])] *= -1.0
+		return new_state

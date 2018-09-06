@@ -27,3 +27,4 @@ class AFH:
 		action_result.append((state, initial_state_amplitude))
 
 		return action_result
+
