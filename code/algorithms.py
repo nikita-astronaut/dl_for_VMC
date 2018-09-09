@@ -5,9 +5,10 @@ def probas(amplitudes):
 	return amplitudes[:, 0] ** 2 + amplitudes[:, 1] ** 2
 
 def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input, 
-	                         n_parallel_generators = 100, trajectory_length = 100):
+	                         num_states, len_thermalization, n_parallel_generators = 100):
 	states = geometry.get_random_states(n_parallel_generators)
 
+	trajectory_length = len_thermalization + num_states // n_parallel_generators + n_parallel_generators
 	trajectory = np.zeros((trajectory_length, states.shape[0], states.shape[1]))
 	for n_step in range(trajectory_length):
 		trajectory[n_step] = states
@@ -24,4 +25,20 @@ def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input,
 		if not np.all(~accepted):
 			states[:, accepted] = states_new[:, accepted]
 
-	return trajectory
+	states = trajectory[len_thermalization:, ...].transpose((0, 2, 1))
+	states = states.reshape((states.shape[0] * states.shape[1], states.shape[2]))
+	return states
+
+def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
+	nm_pairs = []  # contains state_n, state_m and matrix element H_{nm}
+
+	for _ in range(num_states_rhs):
+		state = states[np.random.randint(low=0, high = states.shape[0])]
+		Hstates = hamiltonian(state)
+		for Hstate in Hstates:
+			nm_pairs.append((Hstate[0], state, Hstate[1]))
+	return nm_pairs
+
+def sample_n_values(states, num_states):
+	return states[np.random.randint(low=0, high = states.shape[0], size=num_states)]
+
