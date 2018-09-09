@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 def periodic_padding(image, padding=1):
     '''
     Create a periodic padding (wrap) around the image, to emulate periodic boundary conditions
@@ -47,17 +46,21 @@ def maxpool2d(x, k=2):
 
 
 def _conv_2d_model(x, weights, biases):
+    x = periodic_padding(x, padding = weights['w_conv1'].get_shape().as_list()[1] - 1)
     conv1 = conv2d(x, weights['w_conv1'], biases['b_conv1'])
+    conv1 = periodic_padding(conv1, padding = padding = weights['w_conv2'].get_shape().as_list()[1] - 1)
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 14*14 matrix.
     # conv1 = maxpool2d(conv1, k=2)
 
     # Convolution Layer
     # here we call the conv2d function we had defined above and pass the input image x, weights wc2 and bias bc2.
     conv2 = conv2d(conv1, weights['w_conv2'], biases['b_conv2'])
+    conv2 = periodic_padding(conv2, padding = weights['w_conv3'].get_shape().as_list()[1] - 1)
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 7*7 matrix.
     # conv2 = maxpool2d(conv2, k=2)
 
     conv3 = conv2d(conv2, weights['w_conv3'], biases['b_conv3'])
+    conv3 = periodic_padding(conv3, padding = weights['w_conv4'].get_shape().as_list()[1] - 1)
     conv4 = conv2d(conv3, weights['w_conv4'], biases['b_conv4'])
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 4*4.
     # conv3 = maxpool2d(conv3, k=2)
@@ -73,15 +76,15 @@ def _conv_2d_model(x, weights, biases):
     out = tf.add(tf.matmul(fc1, weights['out']), biases['out'])
     return out
 
-def get_conv2d_model(x_bra, x_ket, input_shape):
+def conv2d_model(x_bra, x_ket, input_shape):
     n = input_shape[1]
 
     weights = {
-        'w_conv1': tf.get_variable('W0', shape=(3,3,1,32), initializer=tf.contrib.layers.xavier_initializer()),  # N -> N - 2
-        'w_conv2': tf.get_variable('W1', shape=(3,3,32,64), initializer=tf.contrib.layers.xavier_initializer()),  # N - 2 -> N - 4
-        'w_conv3': tf.get_variable('W2', shape=(3,3,64,128), initializer=tf.contrib.layers.xavier_initializer()),  # N - 4 -> N - 6
-        'w_conv3': tf.get_variable('W3', shape=(3,3,128,256), initializer=tf.contrib.layers.xavier_initializer()),  # N - 6 -> N - 8
-        'w_dense1': tf.get_variable('W4', shape=((n - 8) * (n - 8) * 256, 256), initializer=tf.contrib.layers.xavier_initializer()), 
+        'w_conv1': tf.get_variable('W0', shape=(3,3,1,32), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv2': tf.get_variable('W1', shape=(3,3,32,64), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv3': tf.get_variable('W2', shape=(5,5,64,128), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv3': tf.get_variable('W3', shape=(7,7,128,256), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_dense1': tf.get_variable('W4', shape=(n * n * 256, 256), initializer=tf.contrib.layers.xavier_initializer()), 
         'out': tf.get_variable('W6', shape=(256,2), initializer=tf.contrib.layers.xavier_initializer()), 
     }
     
@@ -98,3 +101,4 @@ def get_conv2d_model(x_bra, x_ket, input_shape):
     y_ket = _conv_2d_model(x_ket, weights, biases)
 
     return y_bra, y_ket
+
