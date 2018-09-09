@@ -1,6 +1,5 @@
 from copy import deepcopy
 
-
 class AFH:
 	def __init__(self, geometry):
 		self.geometry = geometry

@@ -30,15 +30,21 @@ def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input,
 	return states
 
 def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
+	x_bras, x_kets, Hmns = []
 	nm_pairs = []  # contains state_n, state_m and matrix element H_{nm}
 
 	for _ in range(num_states_rhs):
 		state = states[np.random.randint(low=0, high = states.shape[0])]
 		Hstates = hamiltonian(state)
 		for Hstate in Hstates:
-			nm_pairs.append((Hstate[0], state, Hstate[1]))
-	return nm_pairs
+			x_bras.append(geometry.to_network_format(state))
+			x_kets.append(geometry.to_network_format(Hstate[0]))
+			H_nms.append(Hstate[1])
+	return np.array(x_bras), np.array(x_kets), np.array(H_nms)
 
-def sample_n_values(states, num_states):
-	return states[np.random.randint(low=0, high = states.shape[0], size=num_states)]
+def sample_n_values(states, geometry, num_states):
+	x_bras = []
+	for _ in range(num_states):
+		x_bras.append(geometry.to_network_format(states[np.random.randint(low=0, high = states.shape[0])]))
+	return np.array(x_bras)
 

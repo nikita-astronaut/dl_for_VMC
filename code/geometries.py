@@ -1,9 +1,8 @@
 from copy import deepcopy
 
 class square_geometry:
-	def __init__(self, Lx, Ly):
-		self.Lx = Lx
-		self.Ly = Ly
+	def __init__(self, shape):
+		self.Lx, self.Ly = shape
 
 	def __call__(self, global_index):
 		'''
@@ -24,6 +23,7 @@ class square_geometry:
 		for global_index, amplitude in enumerate(wave_function):
 			x, y = _to_global(x, y)
 			wave_function_2D[x, y] = amplitude
+		return wave_function_2D
 
 	def get_random_state(self, n_states):  # returns multiple states at once
 		return np.random.choice(np.array([-1.0, 1.0]), size = (self.Lx * self.Ly, n_states))
