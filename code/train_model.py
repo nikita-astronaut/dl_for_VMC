@@ -16,8 +16,8 @@ geometry = params.geometry(input_shape)
 
 
 Hnm = tf.placeholder("float", [None])  # placeholder for H matrix elements
-x_bra = tf.placeholder("float", [None, input_shape[0], input_shape[1]])
-x_ket = tf.placeholder("float", [None, input_shape[0], input_shape[1]])
+x_bra = tf.placeholder("float", [None, input_shape[0], input_shape[1], 1])
+x_ket = tf.placeholder("float", [None, input_shape[0], input_shape[1], 1])
 psi_bra, psi_ket = model(x_bra, x_ket, input_shape)
 
 loss_H = tf.reduce_mean(Hnm * psi_bra[:, 0] * psi_ket[:, 0]) + tf.reduce_mean(Hnm * psi_bra[:, 1] * psi_ket[:, 1])
@@ -33,7 +33,7 @@ with tf.Session() as sess:
 
 	for epoch in range(epochs):
 		states = metropolise_sample_chain(geometry, sess, psi_ket, x_ket, 
-	    	                                     epoch_size, 500, n_parallel_generators = 100)
+	    	                                     epoch_size, 1, n_parallel_generators = 100)
 
 		for _ in range(epoch_size // num_nm_rhs):
 			x_bras, x_kets, H_mns = sample_nm_pairs(states, geometry, hamiltonian, num_nm_rhs)

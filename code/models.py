@@ -6,7 +6,7 @@ def periodic_padding(image, padding=1):
     (taken from https://github.com/tensorflow/tensorflow/issues/956)
     '''
 
-    rows, columns = image.shape
+    rows, columns = image.shape[1:3]
     
     # create left matrix
     left_corner_diagonal = tf.eye(padding)
@@ -29,9 +29,20 @@ def periodic_padding(image, padding=1):
     right_matrix = tf.concat([right_left_side, right_center_diagonal, right_right_side], axis=1)
     
     # left and right matrices are immutable
-    padded_image = tf.matmul(left_matrix, tf.matmul(image, right_matrix))
 
-    return padded_image
+    batch_size = tf.shape(image)[0]  # A tensor that gets the batch size at runtime
+    n_channels = tf.shape(image)[-1]
+    right_matrix_expand = tf.expand_dims(right_matrix, axis=0)
+    left_matrix_expand = tf.expand_dims(left_matrix, axis=0)
+
+    right_matrix_expand = tf.expand_dims(right_matrix_expand, axis=-1)
+    left_matrix_expand = tf.expand_dims(left_matrix_expand, axis=-1)
+
+    right_matrix_tile = tf.tile(right_matrix_expand, multiples=[batch_size, 1, 1, n_channels])
+    left_matrix_tile = tf.tile(left_matrix_expand, multiples=[batch_size, 1, 1, n_channels])
+    padded_image = tf.matmul(tf.transpose(left_matrix_tile, perm = [3, 0, 1, 2]), tf.matmul(tf.transpose(image, perm = [3, 0, 1, 2]), tf.transpose(right_matrix_tile, perm = [3, 0, 1, 2])))
+
+    return tf.transpose(padded_image, perm = [1, 2, 3, 0])
 
 
 def conv2d(x, W, b, strides=1):
@@ -46,26 +57,30 @@ def maxpool2d(x, k=2):
 
 
 def _conv_2d_model(x, weights, biases):
-    x = periodic_padding(x, padding = weights['w_conv1'].get_shape().as_list()[1] - 1)
+    print(x.shape)
+    x = periodic_padding(x, padding = (weights['w_conv1'].get_shape().as_list()[1] - 1) // 2)
+    print(x.shape)
     conv1 = conv2d(x, weights['w_conv1'], biases['b_conv1'])
-    conv1 = periodic_padding(conv1, padding = padding = weights['w_conv2'].get_shape().as_list()[1] - 1)
+    print(conv1.shape)
+    conv1 = periodic_padding(conv1, padding = (weights['w_conv2'].get_shape().as_list()[1] - 1) // 2)
+    print(conv1.shape)
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 14*14 matrix.
     # conv1 = maxpool2d(conv1, k=2)
 
     # Convolution Layer
     # here we call the conv2d function we had defined above and pass the input image x, weights wc2 and bias bc2.
     conv2 = conv2d(conv1, weights['w_conv2'], biases['b_conv2'])
-    conv2 = periodic_padding(conv2, padding = weights['w_conv3'].get_shape().as_list()[1] - 1)
+    conv2 = periodic_padding(conv2, padding = (weights['w_conv3'].get_shape().as_list()[1] - 1) // 2)
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 7*7 matrix.
     # conv2 = maxpool2d(conv2, k=2)
 
     conv3 = conv2d(conv2, weights['w_conv3'], biases['b_conv3'])
-    conv3 = periodic_padding(conv3, padding = weights['w_conv4'].get_shape().as_list()[1] - 1)
+    conv3 = periodic_padding(conv3, padding = (weights['w_conv4'].get_shape().as_list()[1] - 1) // 2)
     conv4 = conv2d(conv3, weights['w_conv4'], biases['b_conv4'])
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 4*4.
     # conv3 = maxpool2d(conv3, k=2)
 
-
+    print(conv1.shape, conv2.shape, conv3.shape, conv4.shape)
     # Fully connected layer
     # Reshape conv2 output to fit fully connected layer input
     fc1 = tf.reshape(conv4, [-1, weights['w_dense1'].get_shape().as_list()[0]])
@@ -74,6 +89,7 @@ def _conv_2d_model(x, weights, biases):
     # Output, class prediction
     # finally we multiply the fully connected layer with the weights and add a bias term. 
     out = tf.add(tf.matmul(fc1, weights['out']), biases['out'])
+    print(out.shape, fc1.shape)
     return out
 
 def conv2d_model(x_bra, x_ket, input_shape):
@@ -83,7 +99,7 @@ def conv2d_model(x_bra, x_ket, input_shape):
         'w_conv1': tf.get_variable('W0', shape=(3,3,1,32), initializer=tf.contrib.layers.xavier_initializer()),
         'w_conv2': tf.get_variable('W1', shape=(3,3,32,64), initializer=tf.contrib.layers.xavier_initializer()),
         'w_conv3': tf.get_variable('W2', shape=(5,5,64,128), initializer=tf.contrib.layers.xavier_initializer()),
-        'w_conv3': tf.get_variable('W3', shape=(7,7,128,256), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv4': tf.get_variable('W3', shape=(7,7,128,256), initializer=tf.contrib.layers.xavier_initializer()),
         'w_dense1': tf.get_variable('W4', shape=(n * n * 256, 256), initializer=tf.contrib.layers.xavier_initializer()), 
         'out': tf.get_variable('W6', shape=(256,2), initializer=tf.contrib.layers.xavier_initializer()), 
     }

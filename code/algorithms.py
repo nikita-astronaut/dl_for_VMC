@@ -9,21 +9,21 @@ def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input,
 	states = geometry.get_random_states(n_parallel_generators)
 
 	trajectory_length = len_thermalization + num_states // n_parallel_generators + n_parallel_generators
-	trajectory = np.zeros((trajectory_length, states.shape[0], states.shape[1]))
+	trajectory = np.zeros((trajectory_length, states.shape[0], states.shape[1], states.shape[2], states.shape[3]))
 	for n_step in range(trajectory_length):
 		trajectory[n_step] = states
 
-		amplitudes = tf_sess.run(inference, feed_dict = {tf_input : states})
+		amplitudes = tf_sess.run(tf_output, feed_dict = {tf_input : states})
 		amp_squared = probas(amplitudes)
 
 		states_new = geometry.flip_random_spins(states)
-		amplitudes_new = tf_sess.run(inference, feed_dict = {tf_input : states_new})
+		amplitudes_new = tf_sess.run(tf_output, feed_dict = {tf_input : states_new})
 		amp_squared_new = probas(amplitudes_new)
-		accept_probas = np.minimum(np.ones(n_parallel_generators), amp_squared_new / amp_squared_old)
+		accept_probas = np.minimum(np.ones(n_parallel_generators), amp_squared_new / amp_squared)
 		accepted = accept_probas > np.random.random(size = n_parallel_generators)
-
+		print(amp_squared_new.mean())
 		if not np.all(~accepted):
-			states[:, accepted] = states_new[:, accepted]
+			states[accepted, ...] = states_new[accepted, ...]
 
 	states = trajectory[len_thermalization:, ...].transpose((0, 2, 1))
 	states = states.reshape((states.shape[0] * states.shape[1], states.shape[2]))
