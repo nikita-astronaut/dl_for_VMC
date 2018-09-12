@@ -1,4 +1,5 @@
 from copy import deepcopy
+import numpy as np
 
 class AFH:
 	def __init__(self, geometry):
@@ -9,13 +10,13 @@ class AFH:
 		initial_state_amplitude = 0.0
 
 		for global_index in range(state.shape[0]):
-			neighbors = geometry(global_index)
+			neighbors = self.geometry(global_index)
 			
 			for neighbor in neighbors:
 				s_i = state[global_index]
 				s_j = state[neighbor]
 
-				if s_i == s_j:
+				if np.array_equal(s_i, s_j):
 					initial_state_amplitude += 1.0
 				else:
 					initial_state_amplitude -= 1.0
