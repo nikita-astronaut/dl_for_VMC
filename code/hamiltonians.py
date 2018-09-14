@@ -15,8 +15,7 @@ class AFH:
 			for neighbor in neighbors:
 				s_i = state[global_index]
 				s_j = state[neighbor]
-
-				if np.array_equal(s_i, s_j):
+				if s_i == s_j:
 					initial_state_amplitude += 1.0
 				else:
 					initial_state_amplitude -= 1.0
@@ -25,5 +24,4 @@ class AFH:
 					new_state[neighbor] *= -1.0
 					action_result.append((new_state, 2.0))
 		action_result.append((state, initial_state_amplitude))
-
 		return action_result
