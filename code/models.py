@@ -135,20 +135,20 @@ def conv2d_model(x_bra, x_ket, input_shape):
     n = input_shape[1]
 
     weights = {
-        'w_conv1': tf.get_variable('W0', shape=(5,5,1,64), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv1': tf.get_variable('W0', shape=(5,5,1,32), initializer=tf.contrib.layers.xavier_initializer()),
         # 'w_conv2': tf.get_variable('W1', shape=(3,3,16,32), initializer=tf.contrib.layers.xavier_initializer()),
         # 'w_conv3': tf.get_variable('W2', shape=(3,3,32,64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'w_conv4': tf.get_variable('W3', shape=(3,3,64,128), initializer=tf.contrib.layers.xavier_initializer()),
-        'w_dense1': tf.get_variable('W4', shape=(64, 128), initializer=tf.contrib.layers.xavier_initializer()), 
-        'out': tf.get_variable('W6', shape=(128,2), initializer=tf.contrib.layers.xavier_initializer()), 
+        'w_dense1': tf.get_variable('W4', shape=(32, 32), initializer=tf.contrib.layers.xavier_initializer()), 
+        'out': tf.get_variable('W6', shape=(32,2), initializer=tf.contrib.layers.xavier_initializer()), 
     }
     
     biases = {
-        'b_conv1': tf.get_variable('B0', shape=(64), initializer=tf.contrib.layers.xavier_initializer()),
+        'b_conv1': tf.get_variable('B0', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
         # 'b_conv2': tf.get_variable('B1', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
         # 'b_conv3': tf.get_variable('B2', shape=(64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'b_conv4': tf.get_variable('B3', shape=(128), initializer=tf.contrib.layers.xavier_initializer()),
-        'b_dense1': tf.get_variable('B4', shape=(128), initializer=tf.contrib.layers.xavier_initializer()),
+        'b_dense1': tf.get_variable('B4', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
         'out': tf.get_variable('B5', shape=(2), initializer=tf.contrib.layers.xavier_initializer()),
     }
 
