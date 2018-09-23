@@ -155,5 +155,5 @@ def conv2d_model(x_bra, x_ket, input_shape):
     y_bra = _conv_2d_model(x_bra, weights, biases)
     y_ket = _conv_2d_model(x_ket, weights, biases)
 
-    return y_bra, y_ket
+    return y_bra, y_ket, weights, biases, _conv_2d_model
 

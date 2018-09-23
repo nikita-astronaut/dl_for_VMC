@@ -103,12 +103,17 @@ def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
 	for _ in range(num_states_rhs):
 		state = states[np.random.randint(low=0, high = states.shape[0])]
 		Hstates = hamiltonian(state)
-		
+		x_kets_this = []
+		H_nms_this = []
+		x_bras.append(geometry.to_network_format(state)[0, ...])
+
 		for Hstate in Hstates:
-			x_bras.append(geometry.to_network_format(state)[0, ...])
-			x_kets.append(geometry.to_network_format(Hstate[0])[0, ...])
-			H_nms.append(Hstate[1])
-	return np.array(x_bras), np.array(x_kets), np.array(H_nms), len(H_nms) * 1.0 / num_states_rhs
+			x_kets_this.append(geometry.to_network_format(Hstate[0])[0, ...])
+			H_nms_this.append(Hstate[1])
+
+		x_kets.append(x_kets_this)
+		H_nms.append(H_nms_this)
+	return x_bras, x_kets, H_nms
 
 def sample_n_values(states, geometry, num_states):
 	x_bras = []
