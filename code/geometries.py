@@ -20,13 +20,41 @@ class square_geometry:
 			wave_function_2D[x, y] = amplitude
 		return wave_function_2D[..., np.newaxis]
 		'''
-	def get_random_states(self, n_states):  # returns multiple states at once
-		return np.random.choice(np.array([-1.0, 1.0]), size = (n_states, self.Lx * self.Ly * 1))
+	def get_random_states(self, n_states, sector=None):  # returns multiple states at once
+		if sector == None:
+			return np.random.choice(np.array([-1.0, 1.0]), size = (n_states, self.Lx * self.Ly * 1))
+		states = np.zeros((0, self.Lx * self.Ly))
+		for _ in range(n_states):
+			if sector > 0:
+				state = np.ones(self.Lx * self.Ly) * (-1.0)
+				state[np.random.choice(self.Lx * self.Ly, self.Lx * self.Ly // 2 + sector, replace=False)] *= -1.0
+			else:
+				state = np.ones(self.Lx * self.Ly) * (1.0)
+				state[np.random.choice(self.Lx * self.Ly, self.Lx * self.Ly // 2 - sector, replace=False)] *= -1.0
+			states = np.concatenate([states, state[np.newaxis, ...]], axis = 0)
+		return states
 
 	def flip_random_spins(self, states):  # flips random spins in all states at once
-		new_state = deepcopy(states)
-		new_state[np.arange(states.shape[0]), np.random.randint(low=0, high = states.shape[1], size = states.shape[0])] *= -1.0
-		return new_state
+		new_states = deepcopy(states)
+
+		for i in range(new_states.shape[0]):
+			flipped = False
+			while not flipped:
+				spins = np.random.choice(self.Lx * self.Ly, 2, replace=False)
+				if np.prod(new_states[i, spins]) < 0:
+					new_states[i, spins] *= -1.0
+					flipped = True
+
+		return new_states
+
+	def get_all_states(self, sector=1):
+		states = []
+		for n in range(2 ** (self.Lx * self.Ly)):
+			binary = np.binary_repr(n, width = self.Lx * self.Ly)
+			binary = np.array([int(x) for x in binary]) * 2.0 - 1.0
+			if np.sum(binary) == sector:
+				states.append(binary)
+		return self.to_network_format(np.array(states))
 
 	def __call__(self, global_index):
 		'''

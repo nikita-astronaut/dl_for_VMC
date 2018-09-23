@@ -50,7 +50,7 @@ def conv2d(x, W, b, strides=1):
     # Conv2D wrapper, with bias and relu activation
     x = tf.nn.conv2d(x, W, strides = [1, strides, strides, 1], padding='VALID')
     x = tf.nn.bias_add(x, b)
-    return tf.cos(x) 
+    return tf.nn.tanh(x) 
 
 
 def maxpool2d(x, k=1):
@@ -80,7 +80,7 @@ def _conv_2d_model(x, weights, biases):
     # Max Pooling (down-sampling), this chooses the max value from a 2*2 matrix window and outputs a 4*4.
     # conv3 = maxpool2d(conv3, k=2)
     # conv4 = maxpool2d(conv1, k=conv1.shape[1])
-    conv4 = tf.layers.average_pooling2d(conv1, pool_size=(5, 5), strides=(1,1))
+    conv4 = tf.layers.average_pooling2d(conv1, pool_size=(3, 3), strides=(1,1))
 	# print(conv1.shape, conv2.shape, conv3.shape, conv4.shape)
     # Fully connected layer
     # Reshape conv2 output to fit fully connected layer input
@@ -135,20 +135,20 @@ def conv2d_model(x_bra, x_ket, input_shape):
     n = input_shape[1]
 
     weights = {
-        'w_conv1': tf.get_variable('W0', shape=(5,5,1,32), initializer=tf.contrib.layers.xavier_initializer()),
-        # 'w_conv2': tf.get_variable('W1', shape=(3,3,16,32), initializer=tf.contrib.layers.xavier_initializer()),
+        'w_conv1': tf.get_variable('W0', shape=(3,3,1,8), initializer=tf.contrib.layers.xavier_initializer()),
+        # 'w_conv2': tf.get_variable('W1', shape=(5,5,32,64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'w_conv3': tf.get_variable('W2', shape=(3,3,32,64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'w_conv4': tf.get_variable('W3', shape=(3,3,64,128), initializer=tf.contrib.layers.xavier_initializer()),
-        'w_dense1': tf.get_variable('W4', shape=(32, 32), initializer=tf.contrib.layers.xavier_initializer()), 
-        'out': tf.get_variable('W6', shape=(32,2), initializer=tf.contrib.layers.xavier_initializer()), 
+        'w_dense1': tf.get_variable('W4', shape=(8, 8), initializer=tf.contrib.layers.xavier_initializer()), 
+        'out': tf.get_variable('W6', shape=(8,2), initializer=tf.contrib.layers.xavier_initializer()), 
     }
     
     biases = {
-        'b_conv1': tf.get_variable('B0', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
-        # 'b_conv2': tf.get_variable('B1', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
+        'b_conv1': tf.get_variable('B0', shape=(8), initializer=tf.contrib.layers.xavier_initializer()),
+        # 'b_conv2': tf.get_variable('B1', shape=(64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'b_conv3': tf.get_variable('B2', shape=(64), initializer=tf.contrib.layers.xavier_initializer()),
         # 'b_conv4': tf.get_variable('B3', shape=(128), initializer=tf.contrib.layers.xavier_initializer()),
-        'b_dense1': tf.get_variable('B4', shape=(32), initializer=tf.contrib.layers.xavier_initializer()),
+        'b_dense1': tf.get_variable('B4', shape=(8), initializer=tf.contrib.layers.xavier_initializer()),
         'out': tf.get_variable('B5', shape=(2), initializer=tf.contrib.layers.xavier_initializer()),
     }
 
