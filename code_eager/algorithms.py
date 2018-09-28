@@ -5,11 +5,10 @@ from tqdm import tqdm
 # def probas(amplitudes):
 # 	return amplitudes[:, 0] ** 2 + amplitudes[:, 1] ** 2
 
-def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input, 
-	                         num_states, len_thermalization, n_parallel_generators = 100, n_drop = 10):
+def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_parallel_generators = 100, n_drop = 10):
 	states = geometry.get_random_states(n_parallel_generators, sector = 1)
 	ampl = np.zeros(states.shape[:-1])
-	amplitudes = tf_sess.run(tf_output, feed_dict = {tf_input : geometry.to_network_format(states)})
+	amplitudes = np.array(model(geometry.to_network_format(states).astype(np.float32)))
 	amp_squared = np.exp(amplitudes[:, 0]) ** 2
 	
 	accepts_per_chain = np.zeros((0, n_parallel_generators))
@@ -23,7 +22,7 @@ def metropolise_sample_chain(geometry, tf_sess, tf_output, tf_input,
 	while trajectory.shape[0] * trajectory.shape[1] < num_states:
 		# print(trajectory.shape[0] * 100.0 / num_states)
 		states_new = geometry.flip_random_spins(states)
-		amplitudes_new = tf_sess.run(tf_output, feed_dict = {tf_input : geometry.to_network_format(states_new)})
+		amplitudes_new = np.array(model(geometry.to_network_format(states_new).astype(np.float32)))
 		amp_squared_new = np.exp(amplitudes_new[:, 0]) ** 2
 		
 		accept_probas = np.minimum(np.ones(n_parallel_generators), amp_squared_new / amp_squared)
@@ -100,8 +99,7 @@ def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
 	x_bras, x_kets, H_nms = [], [], []
 	nm_pairs = []  # contains state_n, state_m and matrix element H_{nm}
 	
-	for _ in range(num_states_rhs):
-		state = states[np.random.randint(low=0, high = states.shape[0])]
+	for state in states:
 		Hstates = hamiltonian(state)
 		x_kets_this = []
 		H_nms_this = []
@@ -111,8 +109,8 @@ def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
 			x_kets_this.append(geometry.to_network_format(Hstate[0])[0, ...])
 			H_nms_this.append(Hstate[1])
 
-		x_kets.append(x_kets_this)
-		H_nms.append(H_nms_this)
+		x_kets.append(np.array(x_kets_this))
+		H_nms.append(np.array(H_nms_this))
 	return x_bras, x_kets, H_nms
 
 def sample_n_values(states, geometry, num_states):
