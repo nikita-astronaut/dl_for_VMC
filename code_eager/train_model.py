@@ -1,5 +1,6 @@
 import params
 import numpy as np
+np.set_printoptions(threshold=np.nan)
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import tensorflow as tf
@@ -35,7 +36,7 @@ patience = params.patience
 test_state = geometry.get_random_states(1)
 test_state_2D = geometry.to_network_format(test_state)
 
-
+n_epoch = None
 # print(test_state, test_state_2D.reshape(1, -1))
 model = model(input_shape, geometry)
 print(model(test_state_2D.astype(np.float32)))
@@ -76,21 +77,39 @@ optimizer.apply_gradients(zip(grads_cut, model.variables),
                             global_step=tf.train.get_or_create_global_step())
 '''
 
+def linearize_gradient(grads):
+    grad_lin = np.zeros((0))
+    for grad in grads:
+        grad_lin = np.concatenate([grad_lin, grad.numpy().reshape(-1)], axis = 0)
+    return grad_lin
+
+
+def delinearize_gradient(grad, model):
+    lin_index = 0
+    grad_delin = []
+    for w in model.variables:
+        size = w.numpy().size
+        grad_delin.append(tfe.Variable(grad[lin_index:lin_index + size].reshape(w.numpy().shape)))
+        lin_index += size
+    return grad_delin
+
 def get_derivatives(x_bras, model):
-	grad_psi_im = []
-	grad_psi_re = []
+	grads_psi_im = []
+	grads_psi_re = []
 
 	for x_bra in x_bras:
+		wf = model(x_bra[np.newaxis, ...].astype(np.float32))[0, :].numpy()
 		with tf.GradientTape() as tape:
 			loss_value = model(x_bra[np.newaxis, ...].astype(np.float32))[0, 0]
-		grad_psi_re.append(tape.gradient(loss_value, model.variables))
+		re_grad = linearize_gradient(tape.gradient(loss_value, model.variables))
 
-	for x_bra in x_bras:
 		with tf.GradientTape() as tape:
 			loss_value = model(x_bra[np.newaxis, ...].astype(np.float32))[0, 1]
-		grad_psi_im.append(tape.gradient(loss_value, model.variables))
+		im_grad = linearize_gradient(tape.gradient(loss_value, model.variables))
 	
-	return grad_psi_re, grad_psi_im
+		grads_psi_re.append((re_grad * wf[0] + im_grad * wf[1]) / (wf[0] ** 2 + wf[1] ** 2))
+		grads_psi_im.append((im_grad * wf[0] - re_grad * wf[1]) / (wf[0] ** 2 + wf[1] ** 2))
+	return np.array(grads_psi_re), -1.0 * np.array(grads_psi_im)
 
 
 def get_Elocs(x_bras, x_kets, H_nms, model):
@@ -102,31 +121,26 @@ def get_Elocs(x_bras, x_kets, H_nms, model):
 		psi_bra = model(x_bra[np.newaxis, ...].astype(np.float32))
 		psi_bra = tf.tile(psi_bra, multiples = [len(x_kets_n), psi_bra.shape[1]])
 		psi_ket = model(x_kets_n.astype(np.float32))
-		
+		'''
 		psi_bra_re = tf.exp(psi_bra[:, 0]) * tf.cos(psi_bra[:, 1])
 		psi_bra_im = tf.exp(psi_bra[:, 0]) * tf.sin(psi_bra[:, 1])
 		psi_ket_re = tf.exp(psi_ket[:, 0]) * tf.cos(psi_ket[:, 1])
 		psi_ket_im = tf.exp(psi_ket[:, 0]) * tf.sin(psi_ket[:, 1])
-		
+		'''
+		psi_bra_re = psi_bra[:, 0]
+		psi_bra_im = psi_bra[:, 1]
+		psi_ket_re = psi_ket[:, 0]
+		psi_ket_im = psi_ket[:, 1]
 		E_locs_im.append(tf.reduce_sum(H_nms_n * (psi_bra_re * psi_ket_im - psi_bra_im * psi_ket_re) / (tf.square(psi_bra_re) + tf.square(psi_bra_im))))
 		E_locs_re.append(tf.reduce_sum(H_nms_n * (psi_bra_re * psi_ket_re + psi_bra_im * psi_ket_im) / (tf.square(psi_bra_re) + tf.square(psi_bra_im))))
-	return E_locs_re, E_locs_im
+	return np.array(E_locs_re), np.array(E_locs_im)
 
 
 def get_mean_derivatives(grads_psi_re, grads_psi_im):
 	'''
 		computes <O_w^*(n)> = <dpsi_1(n) / dw> - i <dpsi_2(n) / dw>
 	'''
-
-	n_grads = len(grads_psi_re)
-	grad_psi_re_sum = [tf.multiply(grad, tfe.Variable(0.0)) for grad in grads_psi_re[0]]
-	grad_psi_im_sum = [tf.multiply(grad, tfe.Variable(0.0)) for grad in grads_psi_im[0]]
-
-	for grad_psi_re, grad_psi_im in zip(grads_psi_re, grads_psi_im):
-		grad_psi_re_sum = [tf.add(grad_1, grad_2) for grad_1, grad_2 in zip(grad_psi_re_sum, grad_psi_re)]
-		grad_psi_im_sum = [tf.add(grad_1, grad_2) for grad_1, grad_2 in zip(grad_psi_im_sum, grad_psi_im)]
-	
-	return [tf.divide(grad, tfe.Variable(1.0 * n_grads)) for grad in grad_psi_re_sum], [tf.divide(grad, tfe.Variable(-1.0 * n_grads)) for grad in grad_psi_im_sum]
+	return np.mean(grads_psi_re, axis = 0), np.mean(grads_psi_im, axis = 0)
 
 
 def get_mean_Eloc(E_locs_re, E_locs_im):
@@ -139,33 +153,36 @@ def get_mean_Eloc(E_locs_re, E_locs_im):
 def _get_total_grad(E_locs_re, E_locs_im, grads_psi_re, grads_psi_im):
 	E_loc_re_mean, E_loc_im_mean = get_mean_Eloc(E_locs_re, E_locs_im)
 	grad_re_mean, grad_im_mean = get_mean_derivatives(grads_psi_re, grads_psi_im)
+	E_locs_re = np.tile(E_locs_re[..., np.newaxis], (1, grads_psi_re.shape[1]))
+	E_locs_im = np.tile(E_locs_im[..., np.newaxis], (1, grads_psi_im.shape[1]))
 
-	total_grad = [tf.multiply(grad, tfe.Variable(0.0)) for grad in grad_re_mean]
+	return np.mean(E_locs_re * grads_psi_re, axis = 0) - np.mean(E_locs_im * grads_psi_im, axis = 0) - E_loc_re_mean * grad_re_mean + E_loc_im_mean * grad_im_mean
 
-	for grad_psi_re, grad_psi_im, E_loc_re, E_loc_im in zip(grads_psi_re, grads_psi_im, E_locs_re, E_locs_im):
-		g_re_e_re = [tf.multiply(grad, tfe.Variable(E_loc_re)) for grad in grad_psi_re]
-		g_im_e_im = [tf.multiply(grad, tfe.Variable(E_loc_im)) for grad in grad_psi_im]
-		total_grad = [tf.add(grad_tot, grad_add) for grad_tot, grad_add in zip(total_grad, g_re_e_re)]
-		total_grad = [tf.add(grad_tot, grad_add) for grad_tot, grad_add in zip(total_grad, g_im_e_im)]  # because O*
 
-	total_grad = [tf.divide(grad, tfe.Variable(len(E_locs_re) * 1.0)) for grad in total_grad]
+def get_S_matrix(grads_re, grads_im):
+	global n_epoch
+	S_matrix = np.einsum('ij,ik->jk', grads_re, grads_re) + np.einsum('ij,ik->jk', grads_im, grads_im)
+	S_matrix /= grads_re.shape[0]
+
+	S_matrix -= np.einsum('ij,ik->jk', np.mean(grads_re, axis = 0)[np.newaxis, ...], np.mean(grads_re, axis = 0)[np.newaxis, ...]) + np.einsum('ij,ik->jk', np.mean(grads_im, axis = 0)[np.newaxis, ...], np.mean(grads_im, axis = 0)[np.newaxis, ...])
+	# print(np.linalg.pinv(S_matrix), grads_re, grads_im)
+	# print('grads\n\n\n\n\n')
+	# print(grads_re, grads_im)
+	# print('Smatrix\n\n\n\n\n')
+	# print(np.diag(S_matrix), S_matrix)
+
+	S_matrix += np.max([1e-4, 1e+2 * (0.98 ** n_epoch)]) * np.diag(np.diag(S_matrix))
+
+	return S_matrix
 	
-	gm_re_em_re = [tf.multiply(grad, tfe.Variable(E_loc_re_mean)) for grad in grad_re_mean]
-	gm_im_em_im = [tf.multiply(grad, tfe.Variable(E_loc_im_mean)) for grad in grad_im_mean]
-	
-	total_grad = [tf.subtract(grad_1, grad_2) for grad_1, grad_2 in zip(total_grad, gm_re_em_re)]
-	total_grad = [tf.add(grad_1, grad_2) for grad_1, grad_2 in zip(total_grad, gm_im_em_im)]
-
-
-	# total_grad = [tf.multiply(grad, tf.constant(-1.0)) for grad in total_grad]
-	return total_grad
-
-
 def get_total_grad(x_bras, x_kets, H_nms, model):
 	E_locs_re, E_locs_im = get_Elocs(x_bras, x_kets, H_nms, model)
 	grad_psi_re, grad_psi_im = get_derivatives(x_bras, model)
-	
-	return _get_total_grad(E_locs_re, E_locs_im, grad_psi_re, grad_psi_im)
+	S_matrix = get_S_matrix(grad_psi_re, grad_psi_im)
+	S_matrix_inv = np.linalg.inv(S_matrix)
+	# print(S_matrix_inv)
+	# print('nans = ', np.count_nonzero(np.isnan(np.einsum('ij,j->i', S_matrix_inv, _get_total_grad(E_locs_re, E_locs_im, grad_psi_re, grad_psi_im)).astype(np.float32))))
+	return delinearize_gradient(np.einsum('ij,j->i', S_matrix_inv, _get_total_grad(E_locs_re, E_locs_im, grad_psi_re, grad_psi_im)).astype(np.float32), model)
 
 
 def get_current_loss(x_bras, x_kets, H_nms, model):
@@ -179,11 +196,12 @@ with tf.device('/gpu:0'):
 	optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr)
 
 	for epoch in range(epochs):
+		n_epoch = epoch
 		states, ampls, acc_per_chains, ampls_per_chains = metropolise_sample_chain(geometry, model,
 	   		                                     epoch_size, len_thermalization, n_parallel_generators = n_parallel, n_drop = n_drop)		
 
 		# states_check, ampls_check, accepted = metropolise_check(geometry, sess, psi_ket, x_ket, states, ampls)
-		plt.hist(ampls, bins=np.logspace(np.log(ampls.min()) / np.log(10.0), np.log(ampls.max()) / np.log(10.0), num=100), alpha = 0.3)
+		plt.hist(ampls, bins=np.logspace(np.log(ampls.min() + 1e-10) / np.log(10.0), np.log(ampls.max() + 1e-10) / np.log(10.0), num=100), alpha = 0.3)
 		# plt.hist(ampls_check, bins=np.logspace(np.log(ampls.min()) / np.log(10.0), np.log(ampls.max()) / np.log(10.0), num=100), alpha = 0.3)
 		plt.xlim([ampls.min(), ampls.max()])
 		# plt.title('accepted = ' + str(accepted))
@@ -199,7 +217,7 @@ with tf.device('/gpu:0'):
 		# plt.grid(True)
 		# plt.savefig('./plots/spins_' + str(epoch) + '.pdf')
 		# plt.clf()
-
+		'''
 		plt.hist(acc_per_chains, bins = np.linspace(0, acc_per_chains.max(), 10))
 		plt.grid(True)
 		plt.savefig('./plots/accepts_' + str(epoch) + '.pdf')
@@ -211,7 +229,7 @@ with tf.device('/gpu:0'):
 		plt.grid(True)
 		plt.savefig('./plots/chain_ampls_' + str(epoch) + '.pdf')
 		plt.clf()
-		'''	
+			
 		print('getting all states')
 		all_states = geometry.get_all_states(sector = 1)
 		print('predicting all states')
@@ -227,11 +245,8 @@ with tf.device('/gpu:0'):
 		plt.savefig('./plots/all_ampls_' + str(epoch) + '.pdf')
 		plt.clf()
 		'''
-		print('sampling pairs')
 		x_bras, x_kets, H_nms = sample_nm_pairs(states, geometry, hamiltonian, num_nm_rhs)
-		print('computing grads')
 		grads = get_total_grad(x_bras, x_kets, H_nms, model)
-		print('applying grads')
 		# model.variables = [tf.subtract(w_ini, tf.multiply(grad, tf.constant(lr))) for w_ini, grad in zip(model.variables, grads)]
 		optimizer.apply_gradients(zip(grads, model.variables), global_step=tf.train.get_or_create_global_step())
 		# print(tf.train.get_or_create_global_step())
@@ -245,7 +260,7 @@ with tf.device('/gpu:0'):
 		else:
 			n_epochs_nonimprove += 1
 
-		if n_epochs_nonimprove == patience:
-			lr *= 0.9
-			n_epochs_nonimprove = 0
+		#if n_epochs_nonimprove == patience:
+		#	lr *= 0.9
+		#	n_epochs_nonimprove = 0
 

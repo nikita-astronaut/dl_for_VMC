@@ -53,16 +53,39 @@ class PeriodicPaddingLayer(tf.keras.layers.Layer):
 	def compute_output_shape(self, input_shape):
 		return tf.TensorShape((input_shape[0], self.rows + 2 * self.padding, self.columns + 2 * self.padding, 1))
 
+class ProductLayer(tf.keras.layers.Layer):
+    def __init__(self, input_shape=(1, 1)):
+        super(ProductLayer, self).__init__()
+        self.output_units = input_shape
+
+    def call(self, image):
+        return tf.reduce_prod(image, axis = (1, 2), keepdims = True)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape((input_shape[0], 1, 1, input_shape[3]))
+
+
 def conv2d_model(input_shape, geometry, conv_shapes = [3]):
 	layer = PeriodicPaddingLayer(input_shape = input_shape, padding = conv_shapes[0] // 2)
+	layer_2 = ProductLayer(input_shape=(8, 3, 3, 1))
+	'''	
 	model = tf.keras.Sequential([
 		PeriodicPaddingLayer(input_shape = input_shape, padding = conv_shapes[0] // 2),
-		tf.keras.layers.Conv2D(4, conv_shapes[0], padding = 'valid', data_format = 'channels_last', activation = tf.nn.tanh),
+		tf.keras.layers.Conv2D(32, conv_shapes[0], padding = 'valid', data_format = 'channels_last', activation = tf.nn.tanh),
 		tf.keras.layers.AveragePooling2D(input_shape, padding = 'valid', data_format = 'channels_last'),
 		tf.keras.layers.Flatten(),
 		tf.keras.layers.Dense(8, activation=tf.nn.tanh),
-        tf.keras.layers.Dense(2)
+        tf.keras.layers.Dense(2, use_bias=False)
 	])
-	
+	'''
+	model = tf.keras.Sequential([
+		PeriodicPaddingLayer(input_shape = input_shape, padding = conv_shapes[0] // 2),
+		tf.keras.layers.Conv2D(4, conv_shapes[0], padding = 'valid', data_format = 'channels_last', activation = tf.nn.tanh),
+        ProductLayer(input_shape=(input_shape[0], 3, 3, 4)),
+		tf.keras.layers.Flatten(),
+		tf.keras.layers.Dense(4, activation=tf.nn.tanh),
+		tf.keras.layers.Dense(2, use_bias=False)
+	])
+
 	return model
 

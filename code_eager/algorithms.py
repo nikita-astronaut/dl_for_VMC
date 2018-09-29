@@ -9,7 +9,7 @@ def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_
 	states = geometry.get_random_states(n_parallel_generators, sector = 1)
 	ampl = np.zeros(states.shape[:-1])
 	amplitudes = np.array(model(geometry.to_network_format(states).astype(np.float32)))
-	amp_squared = np.exp(amplitudes[:, 0]) ** 2
+	amp_squared = amplitudes[:, 0] ** 2 + amplitudes[:, 1] ** 2
 	
 	accepts_per_chain = np.zeros((0, n_parallel_generators))
 	ampls_per_chain = np.zeros((0, n_parallel_generators))
@@ -23,7 +23,7 @@ def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_
 		# print(trajectory.shape[0] * 100.0 / num_states)
 		states_new = geometry.flip_random_spins(states)
 		amplitudes_new = np.array(model(geometry.to_network_format(states_new).astype(np.float32)))
-		amp_squared_new = np.exp(amplitudes_new[:, 0]) ** 2
+		amp_squared_new = amplitudes_new[:, 0] ** 2 + amplitudes_new[:, 1] ** 2
 		
 		accept_probas = np.minimum(np.ones(n_parallel_generators), amp_squared_new / amp_squared)
 		accepted = accept_probas > np.random.random(size = n_parallel_generators)
