@@ -65,7 +65,7 @@ class ProductLayer(tf.keras.layers.Layer):
         return tf.TensorShape((input_shape[0], 1, 1, input_shape[3]))
 
 
-def conv2d_model(input_shape, geometry, conv_shapes = [3]):
+def conv2d_model(input_shape, conv_shapes = [3]):
 	layer = PeriodicPaddingLayer(input_shape = input_shape, padding = conv_shapes[0] // 2)
 	layer_2 = ProductLayer(input_shape=(8, 3, 3, 1))
 	'''	
@@ -80,12 +80,22 @@ def conv2d_model(input_shape, geometry, conv_shapes = [3]):
 	'''
 	model = tf.keras.Sequential([
 		PeriodicPaddingLayer(input_shape = input_shape, padding = conv_shapes[0] // 2),
-		tf.keras.layers.Conv2D(4, conv_shapes[0], padding = 'valid', data_format = 'channels_last', activation = tf.nn.tanh),
-        ProductLayer(input_shape=(input_shape[0], 3, 3, 4)),
+		tf.keras.layers.Conv2D(8, conv_shapes[0], padding = 'valid', data_format = 'channels_last', activation = tf.nn.tanh),
+        #ProductLayer(input_shape=(input_shape[0], 3, 3, 4)),
+		tf.keras.layers.AveragePooling2D(input_shape, padding = 'valid', data_format = 'channels_last'),
 		tf.keras.layers.Flatten(),
 		tf.keras.layers.Dense(4, activation=tf.nn.tanh),
-		tf.keras.layers.Dense(2, use_bias=False)
+		tf.keras.layers.Dense(2)#, use_bias=False)
 	])
 
 	return model
 
+
+def dense_model(input_shape):
+	model = tf.keras.Sequential([
+		tf.keras.layers.Dense(9, input_shape=(np.prod(input_shape),), activation=tf.nn.tanh),
+		tf.keras.layers.Dense(9, activation=tf.nn.tanh),
+		tf.keras.layers.Dense(4, activation=tf.nn.tanh),
+		tf.keras.layers.Dense(2, use_bias = False)
+	])
+	return model

@@ -10,16 +10,12 @@ class square_geometry:
 
 	def _to_global(self, x, y):
 		return y * self.Lx + x
-
-	def to_network_format(self, wave_functions):
-		return wave_functions.reshape((-1, self.Lx, self.Ly, 1))
-		'''
-		wave_function_2D = np.zeros((Lx, Ly))
-		for global_index, amplitude in enumerate(wave_function):
-			x, y = _to_global(x, y)
-			wave_function_2D[x, y] = amplitude
-		return wave_function_2D[..., np.newaxis]
-		'''
+	
+	#def to_network_format(self, wave_functions):
+	#	return wave_functions.reshape((self.Lx, self.Ly, 1))
+	def to_network_format(self, wave_function):
+		return wave_function
+	
 	def get_random_states(self, n_states, sector=None):  # returns multiple states at once
 		if sector == None:
 			return np.random.choice(np.array([-1.0, 1.0]), size = (n_states, self.Lx * self.Ly * 1))
@@ -54,7 +50,7 @@ class square_geometry:
 			binary = np.array([int(x) for x in binary]) * 2.0 - 1.0
 			if np.sum(binary) == sector:
 				states.append(binary)
-		return self.to_network_format(np.array(states))
+		return np.array(states)#self.to_network_format(np.array(states))
 
 	def __call__(self, global_index):
 		'''

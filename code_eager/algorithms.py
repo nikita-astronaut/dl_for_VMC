@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 # def probas(amplitudes):
 # 	return amplitudes[:, 0] ** 2 + amplitudes[:, 1] ** 2
-
+'''
 def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_parallel_generators = 100, n_drop = 10):
 	states = geometry.get_random_states(n_parallel_generators, sector = 1)
 	ampl = np.zeros(states.shape[:-1])
@@ -45,8 +45,46 @@ def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_
 	good_trajectories = np.mean(accepts_per_chain, axis = 0) > -0.10
 	trajectory = trajectory[:, good_trajectories, :]
 	trajectory_ampl = trajectory_ampl[:, good_trajectories]
-	print('kicked = ', 1.0 - good_trajectories.mean())
 	return trajectory.reshape((-1, states.shape[1])), trajectory_ampl.reshape((-1)), np.mean(accepts_per_chain, axis = 0)[good_trajectories], np.mean(ampls_per_chain, axis = 0)[good_trajectories]
+'''
+
+def metropolise_sample_chain(geometry, model, num_states, len_thermalization, n_drop = 10):
+	state = geometry.get_random_states(1, sector = 1)[0]
+	amplitude = model(geometry.to_network_format(state[np.newaxis, ...]).astype(np.float32))[0].numpy()
+	amp_squared = np.exp(amplitude[0]) ** 2
+
+	trajectory = np.zeros((0, state.shape[0]))
+	trajectory_ampl = np.zeros((0))
+	accepts = []
+	step_index = 0
+	pbar = tqdm(total = num_states + len_thermalization)
+	while trajectory.shape[0] < num_states:
+		state_new = geometry.flip_random_spins(state[np.newaxis, ...])[0]
+		amplitude_new = model(geometry.to_network_format(state_new[np.newaxis, ...]).astype(np.float32))[0].numpy()
+		amp_squared_new = np.exp(amplitude_new[0]) ** 2
+
+		accept_probas = np.min([1.0, amp_squared_new / amp_squared])
+		accepted = accept_probas > np.random.random()
+		if amp_squared_new / amp_squared > np.exp(5.5) ** 2:
+			pbar.n = 0
+			pbar.refresh()
+			trajectory = np.zeros((0, state.shape[0]))
+			print('high rise happened!')
+			continue
+		if accepted:
+			state = state_new
+			amp_squared = amp_squared_new
+
+		if step_index >= len_thermalization:
+			accepts.append(accepted)
+			trajectory = np.concatenate([trajectory, state[np.newaxis, ...]], axis = 0)
+			trajectory_ampl = np.concatenate([trajectory_ampl, np.array([amp_squared])], axis = 0) 
+		step_index += 1
+		pbar.update(1)
+	pbar.close()
+	print('acceptance rate =', np.mean(accepts))
+	return trajectory, trajectory_ampl
+
 
 def metropolise_check(geometry, tf_sess, tf_output, tf_input,
                       states, amp_squared):
@@ -103,10 +141,10 @@ def sample_nm_pairs(states, geometry, hamiltonian, num_states_rhs):
 		Hstates = hamiltonian(state)
 		x_kets_this = []
 		H_nms_this = []
-		x_bras.append(geometry.to_network_format(state)[0, ...])
+		x_bras.append(geometry.to_network_format(state))#[0, ...])
 
 		for Hstate in Hstates:
-			x_kets_this.append(geometry.to_network_format(Hstate[0])[0, ...])
+			x_kets_this.append(geometry.to_network_format(Hstate[0]))#[0, ...])
 			H_nms_this.append(Hstate[1])
 
 		x_kets.append(np.array(x_kets_this))
